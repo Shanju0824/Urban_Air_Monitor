@@ -349,6 +349,7 @@ app.use((error, _req, res, _next) => {
 });
 
 usingMongo = await connectDb(process.env.MONGODB_URI);
+if (process.env.SERVE_FRONTEND === "true" && !usingMongo) throw new Error("MongoDB must be connected before the deployed service can start.");
 
 if (usingMongo && process.env.INITIAL_ADMIN_USERNAME && process.env.INITIAL_ADMIN_PASSWORD) {
   const username = process.env.INITIAL_ADMIN_USERNAME.trim().toLowerCase();
@@ -364,7 +365,9 @@ if (usingMongo && process.env.INITIAL_ADMIN_USERNAME && process.env.INITIAL_ADMI
 export default app;
 
 if (!process.env.VERCEL) {
-  app.listen(PORT, () => {
+  app.listen(PORT, "0.0.0.0", () => {
     console.log(`Urban Air Monitor API running on http://127.0.0.1:${PORT}`);
   });
 }
+
+

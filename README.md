@@ -7,7 +7,7 @@ A MERN stack environmental monitoring system for centralized AQI, PM2.5, PM10, N
 - React dashboard for urban authorities
 - Express API with MongoDB/Mongoose station and reading models
 - AQI risk bands, trend analytics, active alerts, and policy action queue
-- Seeded sample data fallback so the UI works even before MongoDB is connected
+- Seeded sample data fallback for local development before MongoDB is connected
 
 ## Run locally
 
@@ -30,9 +30,9 @@ Then seed the monitoring stations:
 npm run seed --prefix backend
 ```
 
-If MongoDB is not available, the backend serves the included sample readings.
+If MongoDB is not available, local development serves the included sample readings. Deployed single-server mode requires MongoDB to connect successfully before startup.
 
-The dashboard and station APIs require an authenticated authority account. Accounts are stored with scrypt password hashes; login and public access-request attempts are throttled, and the session cookie is HTTP-only, SameSite strict, and Secure in production. Set `CLIENT_ORIGIN` to the exact deployed frontend origin. Without MongoDB, authority sign-in stays unavailable and protected dashboard data is not served. Dashboard readings are demonstration data unless connected to live monitoring hardware.
+The dashboard and station APIs require an authenticated authority account. Accounts are stored with scrypt password hashes; login and public access-request attempts are throttled, and the session cookie is HTTP-only, SameSite strict, and Secure in production. Set `CLIENT_ORIGIN` to the exact deployed frontend origin when hosting the frontend and API on separate origins. Dashboard readings are demonstration data unless connected to live monitoring hardware.
 
 ## Deploy to Vercel
 
@@ -44,12 +44,16 @@ Add these environment variables in the Vercel project settings for Production (a
 - `SESSION_SECRET`: a stable random secret with at least 32 characters. Generate one with `node -e "console.log(require('node:crypto').randomBytes(48).toString('hex'))"` and store it only in Vercel environment settings.
 - `INITIAL_ADMIN_USERNAME`, `INITIAL_ADMIN_PASSWORD`, and `INITIAL_ADMIN_EMAIL`: set these if the configured database does not already contain the administrator account. The initial password must meet the same strong-password rules as local setup.
 
-In MongoDB Atlas, allow network access for the Vercel deployment before publishing. For production, prefer Vercel Static IPs or another restricted egress range where available rather than a global `0.0.0.0/0` database access rule. Once deployed, test `/api/health`, sign in, request access, and verify that the request status and password setup flow work on a phone.
+In MongoDB Atlas, configure network access for the deployment before publishing. Once deployed, check `/api/health`, sign in, request access, and verify that the request status and password setup flow work on a phone. Vercel Hobby outbound IPs may be dynamic, so Atlas IP allowlisting can be a limitation for this setup.
 
 ## Free demo deployment to Render
 
-The root `render.yaml` configures a single Node web service that builds the Vite frontend and serves it from Express, so the app and `/api` share one origin. Connect a private Git repository containing this project to Render and create a Blueprint from `render.yaml`. Keep `backend/.env` and `.env.local` out of Git; both are ignored by `.gitignore`.
+The root `render.yaml` configures a single Node web service that builds the Vite frontend and serves it from Express, so the app and `/api` share one origin. In Render, create a Blueprint from the GitHub repository and select `render.yaml`. Set the prompted secrets:
 
-During Blueprint setup, provide `MONGODB_URI` as a secret. Render generates `SESSION_SECRET`. After the service is created, open **Connect → Outbound** for the service and add its Singapore outbound CIDR ranges to MongoDB Atlas **Security → Network Access**. These ranges are shared with other Render services in the same region, so they are not dedicated IPs.
+- `MONGODB_URI`: MongoDB Atlas connection URI for the `urban_air_monitor` database.
+- `INITIAL_ADMIN_PASSWORD`: a new strong password (12+ characters with uppercase, lowercase, a number, and a symbol).
+- `INITIAL_ADMIN_EMAIL`: the administrator's email address.
 
-Render Free web services sleep after 15 minutes without traffic and may take about a minute to wake. The free plan is intended for demos and hobby projects, not production authority operations.
+The Blueprint configures the initial administrator ID as `air-admin1`; change that value in `render.yaml` before creating the Blueprint if needed. Render generates `SESSION_SECRET`. In MongoDB Atlas **Security → Network Access**, allow the Singapore outbound IP ranges shown under the service's **Connect → Outbound** tab. Render's ranges are shared with other services in the same region.
+
+Render Free web services sleep after 15 minutes without traffic and may take about a minute to wake. Free services also have an ephemeral filesystem and limited monthly usage. Use the free plan for a demo only, not for production authority operations.
