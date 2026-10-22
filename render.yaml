@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: urban-air-monitor
+    runtime: node
+    plan: free
+    region: singapore
+    buildCommand: npm install --prefix backend && npm install --prefix frontend && npm run build --prefix frontend
+    startCommand: npm run start --prefix backend
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: SERVE_FRONTEND
+        value: "true"
+      - key: MONGODB_URI
+        sync: false
+      - key: SESSION_SECRET
+        generateValue: true
