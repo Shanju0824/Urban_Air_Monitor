@@ -158,19 +158,22 @@ app.post("/api/auth/request", async (req, res, next) => {
     const fullName = String(req.body.fullName || "").trim().slice(0, 100);
     const email = String(req.body.email || "").trim().toLowerCase().slice(0, 254);
     const organization = String(req.body.organization || "").trim().slice(0, 120);
+    const governmentStaffId = String(req.body.governmentStaffId || "").trim().slice(0, 60);
     const reason = String(req.body.reason || "").trim().slice(0, 500);
-    if (fullName.length < 2 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || organization.length < 2 || reason.length < 8) {
-      return res.status(400).json({ message: "Enter your name, valid work email, organization, and a reason of at least 8 characters." });
+    if (fullName.length < 2 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || organization.length < 2 || governmentStaffId.length < 2 || reason.length < 8) {
+      return res.status(400).json({ message: "Enter your name, valid work email, organization, government staff ID, and a reason of at least 8 characters." });
     }
     if (await Authority.exists({ email })) return res.status(409).json({ message: "An account already exists for this email. Contact the authority administrator for your User ID." });
     if (await AccessRequest.exists({ email, status: "pending" })) return res.status(409).json({ message: "An access request for this email is already awaiting review." });
+    if (await Authority.exists({ governmentStaffId })) return res.status(409).json({ message: "An account already exists for this government staff ID. Contact the authority administrator." });
+    if (await AccessRequest.exists({ governmentStaffId, status: "pending" })) return res.status(409).json({ message: "An access request for this government staff ID is already awaiting review." });
 
     const trackingToken = crypto.randomBytes(32).toString("hex");
     const trackingTokenHash = crypto.createHash("sha256").update(trackingToken).digest("hex");
-    const accessRequest = await AccessRequest.create({ fullName, email, organization, reason, trackingTokenHash });
+    const accessRequest = await AccessRequest.create({ fullName, email, organization, governmentStaffId, reason, trackingTokenHash });
     res.status(201).json({ requestId: accessRequest.id, trackingToken, message: "Access request sent. This device will show the approval status and your User ID when the administrator approves it." });
   } catch (error) {
-    if (error.code === 11000) return res.status(409).json({ message: "An access request for this email is already awaiting review." });
+    if (error.code === 11000) return res.status(409).json({ message: "An account or access request already exists for this email or government staff ID." });
     next(error);
   }
 });
@@ -242,7 +245,7 @@ app.post("/api/auth/users", requireAuthority, async (req, res, next) => {
 app.get("/api/auth/pending", requireAuthority, async (req, res, next) => {
   try {
     if (req.authority.role !== "admin") return res.status(403).json({ message: "Administrator access is required." });
-    const requests = await AccessRequest.find({ status: "pending" }).select("fullName email organization reason createdAt").sort({ createdAt: 1 }).lean();
+    const requests = await AccessRequest.find({ status: "pending" }).select("fullName email organization governmentStaffId reason createdAt").sort({ createdAt: 1 }).lean();
     res.json({ requests });
   } catch (error) { next(error); }
 });
@@ -254,7 +257,7 @@ app.post("/api/auth/pending/:id/approve", requireAuthority, async (req, res, nex
     if (!request) return res.status(404).json({ message: "Access request not found or already processed." });
     const username = String(req.body.username || "").trim().toLowerCase();
     if (!/^[a-z0-9._-]{3,40}$/.test(username)) return res.status(400).json({ message: "User ID must be 3–40 letters, numbers, dots, underscores, or hyphens." });
-    const user = await Authority.create({ username, email: request.email, role: "authority", active: false });
+    const user = await Authority.create({ username, email: request.email, governmentStaffId: request.governmentStaffId, role: "authority", active: false });
     request.status = "approved";
     request.approvedBy = req.authority._id;
     request.authorityId = user._id;
