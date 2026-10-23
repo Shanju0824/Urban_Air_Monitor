@@ -262,8 +262,12 @@ app.get("/api/auth/pending/:id/staff-id-proof", requireAuthority, async (req, re
     if (!/^[a-f\d]{24}$/i.test(req.params.id)) return res.status(400).json({ message: "Invalid access request." });
     const request = await AccessRequest.findOne({ _id: req.params.id, status: "pending" }).select("+idProofImage.data").lean();
     if (!request?.idProofImage?.data) return res.status(404).json({ message: "ID proof image was not found." });
+    const storedImage = request.idProofImage.data;
+    const imageBuffer = Buffer.isBuffer(storedImage)
+      ? storedImage
+      : Buffer.from(typeof storedImage.value === "function" ? storedImage.value(true) : storedImage.buffer || storedImage);
     res.set({ "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff", "Content-Disposition": "inline; filename=government-staff-id-proof" });
-    res.type(request.idProofImage.contentType).send(request.idProofImage.data);
+    res.type(request.idProofImage.contentType).send(imageBuffer);
   } catch (error) { next(error); }
 });
 
