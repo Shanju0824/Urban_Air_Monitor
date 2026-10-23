@@ -1000,3 +1000,11 @@ html { scroll-behavior: smooth; scroll-padding-top: 18px; }
 .id-proof-preview img { border: 1px solid #dfe3ef; border-radius: 6px; height: 72px; object-fit: contain; width: 110px; }
 .id-proof-preview span { color: #56627c; flex: 1; font-size: 0.82rem; overflow-wrap: anywhere; }
 .id-proof-preview button { background: transparent; border: 0; color: #5159c8; cursor: pointer; font-weight: 700; }
+.map-tooltip { background: #f8fbff; border-color: #cbd6e8; box-shadow: 0 16px 38px rgba(14, 31, 58, .25); color: #20314c; }
+.tooltip-heading > strong { color: #172a45; }
+.tooltip-kicker { color: #47617b; }
+.tooltip-aqi > span { color: #51637a; }
+.tooltip-aqi > em { color: #805000; }
+.tooltip-readings { border-top-color: #d8e0ec; }
+.tooltip-readings > span { color: #52637a; }
+.tooltip-readings b { color: #172a45; }
