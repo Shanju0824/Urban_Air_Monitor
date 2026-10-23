@@ -32,6 +32,40 @@ function formatDate(value) {
   return new Intl.DateTimeFormat("en-IN", { day: "2-digit", month: "short" }).format(new Date(value));
 }
 
+async function prepareIdProofImage(file) {
+  if (!/^image\/(jpeg|png|webp)$/.test(file.type)) throw new Error("Choose a JPG, PNG, or WebP image.");
+  if (file.size > 15 * 1024 * 1024) throw new Error("This photo is too large to process. Choose an image under 15 MB.");
+  const bitmap = await createImageBitmap(file);
+  let scale = Math.min(1, 1800 / Math.max(bitmap.width, bitmap.height));
+  let quality = 0.88;
+  try {
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+      canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+      const context = canvas.getContext("2d");
+      if (!context) throw new Error("Could not process the selected image. Please choose another photo.");
+      context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+      const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", quality));
+      if (!blob) throw new Error("Could not process the selected image. Please choose another photo.");
+      if (blob.size <= 2.5 * 1024 * 1024) {
+        const dataUrl = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = () => reject(new Error("Could not read the selected ID image."));
+          reader.readAsDataURL(blob);
+        });
+        return { dataUrl, name: file.name };
+      }
+      if (quality > 0.5) quality -= 0.1;
+      else { scale *= 0.8; quality = 0.82; }
+    }
+  } finally {
+    bitmap.close?.();
+  }
+  throw new Error("Could not reduce this photo enough. Choose a smaller image.");
+}
+
 function metricLabel(key) {
   const labels = { aqi: "AQI", pm25: "PM2.5", pm10: "PM10", no2: "NO2", so2: "SO2" };
   return labels[key] || key;
@@ -112,6 +146,7 @@ function LoginPage({ onLogin }) {
   const [password, setPassword] = useState("");
   const [request, setRequest] = useState({ fullName: "", email: "", organization: "", reason: "" });
   const [idProofImage, setIdProofImage] = useState(null);
+  const [proofProcessing, setProofProcessing] = useState(false);
   const [idProofInputKey, setIdProofInputKey] = useState(0);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -149,13 +184,7 @@ function LoginPage({ onLogin }) {
     try {
       if (mode === "request") {
         if (!idProofImage) throw new Error("Upload a clear image of your government staff ID before sending the request.");
-        const idProofDataUrl = await new Promise((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result);
-          reader.onerror = () => reject(new Error("Could not read the selected ID image."));
-          reader.readAsDataURL(idProofImage);
-        });
-        const response = await fetch(`${API_URL}/auth/request`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...request, idProofImage: idProofDataUrl }) });
+        const response = await fetch(`${API_URL}/auth/request`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...request, idProofImage: idProofImage.dataUrl }) });
         const data = await response.json();
         if (!response.ok) throw new Error(data.message || "Unable to submit your access request.");
         const tracking = { requestId: data.requestId, trackingToken: data.trackingToken, status: "pending" };
@@ -227,9 +256,9 @@ function LoginPage({ onLogin }) {
           <label htmlFor="request-name">Full name</label><input id="request-name" autoComplete="name" value={request.fullName} onChange={(event) => setRequest({ ...request, fullName: event.target.value })} maxLength={100} required />
           <label htmlFor="request-email">Work email</label><input id="request-email" type="email" autoComplete="email" value={request.email} onChange={(event) => setRequest({ ...request, email: event.target.value })} maxLength={254} required />
           <label htmlFor="request-organization">Department or organization</label><input id="request-organization" value={request.organization} onChange={(event) => setRequest({ ...request, organization: event.target.value })} maxLength={120} required />
-          <label htmlFor="request-government-staff-id-proof">Upload government staff ID proof</label><input key={idProofInputKey} id="request-government-staff-id-proof" type="file" accept="image/jpeg,image/png,image/webp" capture="environment" onChange={(event) => { const file = event.target.files?.[0] || null; if (file && file.size > 3 * 1024 * 1024) { setIdProofImage(null); setError("ID image must be no larger than 3 MB."); event.target.value = ""; return; } setError(""); setIdProofImage(file); }} required /><small className="field-help">Upload a clear JPG, PNG, or WebP image, up to 3 MB. The administrator will review it before approving access.</small>
+          <label htmlFor="request-government-staff-id-proof">Upload government staff ID proof</label><input key={idProofInputKey} id="request-government-staff-id-proof" type="file" accept="image/jpeg,image/png,image/webp" onChange={async (event) => { const file = event.target.files?.[0] || null; if (!file) return; setError(""); setIdProofImage(null); setProofProcessing(true); try { setIdProofImage(await prepareIdProofImage(file)); } catch (imageError) { setError(imageError.message); event.target.value = ""; } finally { setProofProcessing(false); } }} required /><small className="field-help">Choose from your camera or photo gallery. The photo is resized for upload; review the preview, then tap Send access request.</small>{proofProcessing && <small className="field-help">Preparing your ID photo…</small>}{idProofImage && <div className="id-proof-preview"><img src={idProofImage.dataUrl} alt="Preview of selected government staff ID proof" /><span>{idProofImage.name} · ready to submit</span><button type="button" onClick={() => { setIdProofImage(null); setIdProofInputKey((key) => key + 1); }}>Remove photo</button></div>}
           <label htmlFor="request-reason">Reason for access</label><textarea id="request-reason" value={request.reason} onChange={(event) => setRequest({ ...request, reason: event.target.value })} maxLength={500} rows={3} required />
-          <button type="submit" disabled={busy}>{busy ? "Sending request…" : "Send access request"}</button>
+          <button type="submit" disabled={busy || proofProcessing}>{proofProcessing ? "Preparing ID photo…" : busy ? "Sending request…" : "Send access request"}</button>
         </form>}
         {mode === "request" && accessStatus && <section className={`access-status-card ${accessStatus.status === "approved" ? "approved" : "pending"}`} aria-live="polite">
           <strong>{accessStatus.status === "approved" ? "Access approved" : "Request status: awaiting review"}</strong>

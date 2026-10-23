@@ -996,3 +996,7 @@ html { scroll-behavior: smooth; scroll-padding-top: 18px; }
 .login-form input[type="file"] { cursor: pointer; font-size: 0.85rem; padding: 10px; }
 .login-form input[type="file"]::file-selector-button { background: #eef0ff; border: 0; border-radius: 7px; color: #5159c8; cursor: pointer; font-weight: 700; margin-right: 10px; padding: 8px 10px; }
 .proof-image-link { color: #5159c8; font-size: 0.9rem; font-weight: 700; margin: 5px 0; text-decoration: underline; }
+.id-proof-preview { align-items: center; background: #f7f8fc; border: 1px solid #dfe3ef; border-radius: 10px; display: flex; flex-wrap: wrap; gap: 10px; padding: 10px; }
+.id-proof-preview img { border: 1px solid #dfe3ef; border-radius: 6px; height: 72px; object-fit: contain; width: 110px; }
+.id-proof-preview span { color: #56627c; flex: 1; font-size: 0.82rem; overflow-wrap: anywhere; }
+.id-proof-preview button { background: transparent; border: 0; color: #5159c8; cursor: pointer; font-weight: 700; }
