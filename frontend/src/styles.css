@@ -1026,6 +1026,7 @@ html { scroll-behavior: smooth; scroll-padding-top: 18px; }
 .map-tooltip .tooltip-readings > span, .map-tooltip > div:not(.tooltip-aqi) > span { color: #40536d !important; }
 .map-tooltip .tooltip-readings b, .map-tooltip > div:not(.tooltip-aqi) > span b { color: #172a45 !important; }
 .dashboard-content .hero-visual .map-tooltip { box-sizing: border-box; left: auto; margin: 12px auto 0; max-width: min(360px, 100%); min-width: 0; position: relative; top: auto; transform: none; width: min(360px, 100%); }
+.dashboard-content .hero > .map-tooltip { grid-column: 1 / -1; justify-self: start; margin: 0; max-width: 720px; width: 100%; }
 @media (max-width: 640px) {
-  .dashboard-content .hero-visual .map-tooltip { margin: 12px 0 0; max-width: 100%; width: 100%; }
+  .dashboard-content .hero > .map-tooltip { max-width: 100%; width: 100%; }
 }

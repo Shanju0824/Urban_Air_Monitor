@@ -460,12 +460,12 @@ function App() {
       {notice && <button className="notice" onClick={() => setNotice("")}>{notice}</button>}
 
       <div className="module-view" hidden={activeModule !== "overview"}>
-      <section className="hero" id="overview">
+      <section className="hero" id="overview" onMouseLeave={() => setHoveredStation(null)}>
         <div className="hero-copy">
           <p className="eyebrow">AQI / PM2.5 / PM10 / NO2 / SO2</p>
           <h1>Live pollution trends for public health and policy response.</h1>
         </div>
-        <div className="hero-visual" onMouseLeave={() => setHoveredStation(null)}>
+        <div className="hero-visual">
           <div className="air-map">
             {dashboard?.stations.map((station, index) => (
               <button
@@ -487,13 +487,13 @@ function App() {
               />
             ))}
           </div>
-          {hoveredStation && (() => {
-            const station = dashboard.stations.find((item) => item.id === hoveredStation);
-            if (!station) return null;
-            return <div className="map-tooltip" role="status" style={{ "--tip-color": station.band.color }}><div className="tooltip-heading"><span className="tooltip-kicker">{station.zone}</span><strong>{station.name}</strong></div><div className="tooltip-aqi"><b>{station.latest.aqi}</b><span>AQI</span><em>{station.band.label} intensity</em></div><div className="tooltip-readings"><span>PM2.5 <b>{station.latest.pm25} µg/m³</b></span><span>PM10 <b>{station.latest.pm10} µg/m³</b></span><span>NO₂ <b>{station.latest.no2} ppb</b></span><span>SO₂ <b>{station.latest.so2} ppb</b></span></div></div>;
-          })()}
           <div className="map-caption"><span><i /> Monitoring locations</span><span>Hover or tap a point for readings</span></div>
         </div>
+        {hoveredStation && (() => {
+          const station = dashboard.stations.find((item) => item.id === hoveredStation);
+          if (!station) return null;
+          return <div className="map-tooltip" role="status" style={{ "--tip-color": station.band.color }}><div className="tooltip-heading"><span className="tooltip-kicker">{station.zone}</span><strong>{station.name}</strong></div><div className="tooltip-aqi"><b>{station.latest.aqi}</b><span>AQI</span><em>{station.band.label} intensity</em></div><div className="tooltip-readings"><span>PM2.5 <b>{station.latest.pm25} µg/m³</b></span><span>PM10 <b>{station.latest.pm10} µg/m³</b></span><span>NO₂ <b>{station.latest.no2} ppb</b></span><span>SO₂ <b>{station.latest.so2} ppb</b></span></div></div>;
+        })()}
       </section>
 
       <section className="stats-grid">
