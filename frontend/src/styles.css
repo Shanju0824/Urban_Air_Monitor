@@ -1018,3 +1018,10 @@ html { scroll-behavior: smooth; scroll-padding-top: 18px; }
   .dashboard-content .hero-visual .tooltip-readings > span { color: #52637a; }
   .dashboard-content .hero-visual .tooltip-readings b { color: #172a45; }
 }
+.map-tooltip .tooltip-kicker { color: #405873 !important; }
+.map-tooltip .tooltip-heading > strong { color: #172a45 !important; }
+.map-tooltip .tooltip-aqi > b, .map-tooltip > b { color: var(--tip-color) !important; }
+.map-tooltip .tooltip-aqi > span, .map-tooltip > b small { color: #52637a !important; }
+.map-tooltip .tooltip-aqi > em, .map-tooltip .tooltip-level { color: #805000 !important; }
+.map-tooltip .tooltip-readings > span, .map-tooltip > div:not(.tooltip-aqi) > span { color: #40536d !important; }
+.map-tooltip .tooltip-readings b, .map-tooltip > div:not(.tooltip-aqi) > span b { color: #172a45 !important; }
