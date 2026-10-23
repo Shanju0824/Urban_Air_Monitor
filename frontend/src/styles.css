@@ -986,3 +986,8 @@ html { scroll-behavior: smooth; scroll-padding-top: 18px; }
   .dashboard-content .hero-visual .tooltip-readings > span { font-size: .72rem; }
   .dashboard-content .hero-visual .tooltip-readings b { font-size: .83rem; }
 }
+
+.refresh-button:disabled { cursor: wait; opacity: .78; }
+.refresh-button.is-refreshing svg { animation: refresh-rotate .8s linear infinite; }
+@keyframes refresh-rotate { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .refresh-button.is-refreshing svg { animation-duration: 2s; } }

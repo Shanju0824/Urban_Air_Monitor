@@ -289,7 +289,7 @@ function App() {
   async function loadDashboard() {
     setLoading(true);
     try {
-      const response = await fetch(`${API_URL}/dashboard`, { credentials: "include" });
+      const response = await fetch(`${API_URL}/dashboard`, { credentials: "include", cache: "no-store" });
       if (response.status === 401) {
         setAuthority(null);
         setDashboard(null);
@@ -411,7 +411,7 @@ function App() {
           <span><Wind size={19} /> Urban Air Monitor</span>
           <strong>Centralized pollution command system</strong>
         </div>
-        <div className="topbar-actions"><span className="authority-label">{authority.username} · {authority.role}</span><button className="icon-button" onClick={loadDashboard} aria-label="Refresh dashboard"><RefreshCw size={18} /></button></div>
+        <div className="topbar-actions"><span className="authority-label">{authority.username} · {authority.role}</span><button type="button" className={`icon-button refresh-button${loading ? " is-refreshing" : ""}`} onClick={loadDashboard} disabled={loading} aria-label={loading ? "Refreshing dashboard" : "Refresh dashboard"} title={loading ? "Refreshing dashboard…" : "Refresh dashboard"} aria-busy={loading}><RefreshCw size={18} /></button></div>
       </header>
 
       {showAccessRequests && activeModule === "access-requests" && authority.role === "admin" && <section className="access-requests access-requests-module"><div className="access-requests-title"><div><span className="eyebrow">ADMINISTRATION</span><h2>New authority requests</h2><p className="access-requests-subtitle">Review each request and issue a private User ID. The approved user creates their own password.</p></div><button className="icon-button" onClick={() => { setShowAccessRequests(false); setActiveModule("overview"); }} aria-label="Close access requests">×</button></div>{accessNotice && <p className={accessNotice.startsWith("Access approved") ? "login-success" : "login-error"} role="status">{accessNotice}</p>}{pendingAccounts.length ? pendingAccounts.map((account) => <article className="pending-account request-card" key={account._id}><div className="request-person"><strong>{account.fullName}</strong><span>{account.email}</span><small>{account.organization} · Requested {formatDate(account.createdAt)}</small><p>{account.reason}</p></div><div className="provision-fields"><label>User ID<input value={approvalCredentials[account._id]?.username || ""} onChange={(event) => setApprovalCredentials((current) => ({ ...current, [account._id]: { ...current[account._id], username: event.target.value } }))} autoComplete="off" placeholder="Create a private ID" /></label><button className="approve-button" onClick={() => approveAccount(account._id)}>Approve &amp; issue User ID</button></div></article>) : !accessNotice && <p className="muted-note">There are no pending requests.</p>}</section>}
