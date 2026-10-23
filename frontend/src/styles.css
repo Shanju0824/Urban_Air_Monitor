@@ -1008,3 +1008,13 @@ html { scroll-behavior: smooth; scroll-padding-top: 18px; }
 .tooltip-readings { border-top-color: #d8e0ec; }
 .tooltip-readings > span { color: #52637a; }
 .tooltip-readings b { color: #172a45; }
+@media (min-width: 641px) {
+  .dashboard-content .hero-visual .map-tooltip { background: #f8fbff; border-color: #b9c9df; color: #20314c; max-width: 360px; min-width: 250px; width: min(360px, calc(100vw - 32px)); }
+  .dashboard-content .hero-visual .tooltip-heading > strong { color: #172a45; }
+  .dashboard-content .hero-visual .tooltip-kicker { color: #47617b; }
+  .dashboard-content .hero-visual .tooltip-aqi > span { color: #51637a; }
+  .dashboard-content .hero-visual .tooltip-aqi > em { color: #805000; }
+  .dashboard-content .hero-visual .tooltip-readings { border-top-color: #d8e0ec; }
+  .dashboard-content .hero-visual .tooltip-readings > span { color: #52637a; }
+  .dashboard-content .hero-visual .tooltip-readings b { color: #172a45; }
+}
