@@ -110,7 +110,9 @@ function LoginPage({ onLogin }) {
   const [mode, setMode] = useState(() => accessStatus ? "request" : "signin");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [request, setRequest] = useState({ fullName: "", email: "", organization: "", governmentStaffId: "", reason: "" });
+  const [request, setRequest] = useState({ fullName: "", email: "", organization: "", reason: "" });
+  const [idProofImage, setIdProofImage] = useState(null);
+  const [idProofInputKey, setIdProofInputKey] = useState(0);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [busy, setBusy] = useState(false);
@@ -146,14 +148,23 @@ function LoginPage({ onLogin }) {
     setSuccess("");
     try {
       if (mode === "request") {
-        const response = await fetch(`${API_URL}/auth/request`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(request) });
+        if (!idProofImage) throw new Error("Upload a clear image of your government staff ID before sending the request.");
+        const idProofDataUrl = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = () => reject(new Error("Could not read the selected ID image."));
+          reader.readAsDataURL(idProofImage);
+        });
+        const response = await fetch(`${API_URL}/auth/request`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...request, idProofImage: idProofDataUrl }) });
         const data = await response.json();
         if (!response.ok) throw new Error(data.message || "Unable to submit your access request.");
         const tracking = { requestId: data.requestId, trackingToken: data.trackingToken, status: "pending" };
         localStorage.setItem("urban-air-access-request", JSON.stringify(tracking));
         setAccessStatus(tracking);
         setSuccess(data.message || "Access request sent. The authority administrator will review it in the app.");
-        setRequest({ fullName: "", email: "", organization: "", governmentStaffId: "", reason: "" });
+        setRequest({ fullName: "", email: "", organization: "", reason: "" });
+        setIdProofImage(null);
+        setIdProofInputKey((key) => key + 1);
         return;
       }
       const response = await fetch(`${API_URL}/auth/login`, {
@@ -216,7 +227,7 @@ function LoginPage({ onLogin }) {
           <label htmlFor="request-name">Full name</label><input id="request-name" autoComplete="name" value={request.fullName} onChange={(event) => setRequest({ ...request, fullName: event.target.value })} maxLength={100} required />
           <label htmlFor="request-email">Work email</label><input id="request-email" type="email" autoComplete="email" value={request.email} onChange={(event) => setRequest({ ...request, email: event.target.value })} maxLength={254} required />
           <label htmlFor="request-organization">Department or organization</label><input id="request-organization" value={request.organization} onChange={(event) => setRequest({ ...request, organization: event.target.value })} maxLength={120} required />
-          <label htmlFor="request-government-staff-id">Government staff ID</label><input id="request-government-staff-id" autoComplete="off" value={request.governmentStaffId} onChange={(event) => setRequest({ ...request, governmentStaffId: event.target.value })} maxLength={60} required /><small className="field-help">Your administrator will verify this ID before approving access.</small>
+          <label htmlFor="request-government-staff-id-proof">Upload government staff ID proof</label><input key={idProofInputKey} id="request-government-staff-id-proof" type="file" accept="image/jpeg,image/png,image/webp" capture="environment" onChange={(event) => { const file = event.target.files?.[0] || null; if (file && file.size > 3 * 1024 * 1024) { setIdProofImage(null); setError("ID image must be no larger than 3 MB."); event.target.value = ""; return; } setError(""); setIdProofImage(file); }} required /><small className="field-help">Upload a clear JPG, PNG, or WebP image, up to 3 MB. The administrator will review it before approving access.</small>
           <label htmlFor="request-reason">Reason for access</label><textarea id="request-reason" value={request.reason} onChange={(event) => setRequest({ ...request, reason: event.target.value })} maxLength={500} rows={3} required />
           <button type="submit" disabled={busy}>{busy ? "Sending request…" : "Send access request"}</button>
         </form>}
@@ -415,7 +426,7 @@ function App() {
         <div className="topbar-actions"><span className="authority-label">{authority.username} · {authority.role}</span><button type="button" className={`icon-button refresh-button${loading ? " is-refreshing" : ""}`} onClick={loadDashboard} disabled={loading} aria-label={loading ? "Refreshing dashboard" : "Refresh dashboard"} title={loading ? "Refreshing dashboard…" : "Refresh dashboard"} aria-busy={loading}><RefreshCw size={18} /></button></div>
       </header>
 
-      {showAccessRequests && activeModule === "access-requests" && authority.role === "admin" && <section className="access-requests access-requests-module"><div className="access-requests-title"><div><span className="eyebrow">ADMINISTRATION</span><h2>New authority requests</h2><p className="access-requests-subtitle">Verify the government staff ID, then issue a private User ID. The approved user creates their own password.</p></div><button className="icon-button" onClick={() => { setShowAccessRequests(false); setActiveModule("overview"); }} aria-label="Close access requests">×</button></div>{accessNotice && <p className={accessNotice.startsWith("Access approved") ? "login-success" : "login-error"} role="status">{accessNotice}</p>}{pendingAccounts.length ? pendingAccounts.map((account) => <article className="pending-account request-card" key={account._id}><div className="request-person"><strong>{account.fullName}</strong><span>{account.email}</span><small>{account.organization} · Requested {formatDate(account.createdAt)}</small><p className="staff-id-review"><strong>Government staff ID:</strong> {account.governmentStaffId || "Not provided"}</p><p>{account.reason}</p></div><div className="provision-fields"><label>User ID<input value={approvalCredentials[account._id]?.username || ""} onChange={(event) => setApprovalCredentials((current) => ({ ...current, [account._id]: { ...current[account._id], username: event.target.value } }))} autoComplete="off" placeholder="Create a private ID" /></label><button className="approve-button" onClick={() => approveAccount(account._id)}>Approve &amp; issue User ID</button></div></article>) : !accessNotice && <p className="muted-note">There are no pending requests.</p>}</section>}
+      {showAccessRequests && activeModule === "access-requests" && authority.role === "admin" && <section className="access-requests access-requests-module"><div className="access-requests-title"><div><span className="eyebrow">ADMINISTRATION</span><h2>New authority requests</h2><p className="access-requests-subtitle">Review the government staff ID proof, then issue a private User ID. The approved user creates their own password.</p></div><button className="icon-button" onClick={() => { setShowAccessRequests(false); setActiveModule("overview"); }} aria-label="Close access requests">×</button></div>{accessNotice && <p className={accessNotice.startsWith("Access approved") ? "login-success" : "login-error"} role="status">{accessNotice}</p>}{pendingAccounts.length ? pendingAccounts.map((account) => <article className="pending-account request-card" key={account._id}><div className="request-person"><strong>{account.fullName}</strong><span>{account.email}</span><small>{account.organization} · Requested {formatDate(account.createdAt)}</small>{account.idProofImage?.contentType ? <a className="proof-image-link" href={`${API_URL}/auth/pending/${account._id}/staff-id-proof`} target="_blank" rel="noreferrer">View government staff ID image</a> : <p className="staff-id-review"><strong>ID proof:</strong> No image attached; approval is disabled.</p>}<p>{account.reason}</p></div><div className="provision-fields"><label>User ID<input value={approvalCredentials[account._id]?.username || ""} onChange={(event) => setApprovalCredentials((current) => ({ ...current, [account._id]: { ...current[account._id], username: event.target.value } }))} autoComplete="off" placeholder="Create a private ID" /></label><button className="approve-button" onClick={() => approveAccount(account._id)} disabled={!account.idProofImage?.contentType}>Approve &amp; issue User ID</button></div></article>) : !accessNotice && <p className="muted-note">There are no pending requests.</p>}</section>}
 
       {notice && <button className="notice" onClick={() => setNotice("")}>{notice}</button>}
 

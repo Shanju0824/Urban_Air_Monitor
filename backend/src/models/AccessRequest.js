@@ -4,7 +4,11 @@ const accessRequestSchema = new mongoose.Schema({
   fullName: { type: String, required: true, trim: true, maxlength: 100 },
   email: { type: String, required: true, lowercase: true, trim: true, maxlength: 254 },
   organization: { type: String, required: true, trim: true, maxlength: 120 },
-  governmentStaffId: { type: String, required: true, trim: true, maxlength: 60 },
+  governmentStaffId: { type: String, trim: true, maxlength: 60 },
+  idProofImage: {
+    data: { type: Buffer, select: false },
+    contentType: { type: String, enum: ["image/jpeg", "image/png", "image/webp"] }
+  },
   reason: { type: String, required: true, trim: true, maxlength: 500 },
   trackingTokenHash: { type: String, select: false },
   status: { type: String, enum: ["pending", "approved"], default: "pending", index: true },

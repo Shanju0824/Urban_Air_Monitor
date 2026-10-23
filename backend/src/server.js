@@ -40,7 +40,7 @@ app.use(cors({
   },
   credentials: true
 }));
-app.use(express.json({ limit: "1mb" }));
+app.use(express.json({ limit: "5mb" }));
 app.use(morgan("dev"));
 app.use("/api", (req, res, next) => {
   const origin = req.get("origin");
@@ -158,22 +158,28 @@ app.post("/api/auth/request", async (req, res, next) => {
     const fullName = String(req.body.fullName || "").trim().slice(0, 100);
     const email = String(req.body.email || "").trim().toLowerCase().slice(0, 254);
     const organization = String(req.body.organization || "").trim().slice(0, 120);
-    const governmentStaffId = String(req.body.governmentStaffId || "").trim().slice(0, 60);
+    const idProofMatch = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z\d+/]+={0,2})$/.exec(String(req.body.idProofImage || ""));
     const reason = String(req.body.reason || "").trim().slice(0, 500);
-    if (fullName.length < 2 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || organization.length < 2 || governmentStaffId.length < 2 || reason.length < 8) {
-      return res.status(400).json({ message: "Enter your name, valid work email, organization, government staff ID, and a reason of at least 8 characters." });
+    if (fullName.length < 2 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || organization.length < 2 || !idProofMatch || reason.length < 8) {
+      return res.status(400).json({ message: "Enter your details, upload a JPG, PNG, or WebP image of your government staff ID, and provide a reason of at least 8 characters." });
+    }
+    const proofBuffer = Buffer.from(idProofMatch[2], "base64");
+    const isPng = proofBuffer.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
+    const isJpeg = proofBuffer[0] === 0xff && proofBuffer[1] === 0xd8 && proofBuffer[2] === 0xff;
+    const isWebp = proofBuffer.toString("ascii", 0, 4) === "RIFF" && proofBuffer.toString("ascii", 8, 12) === "WEBP";
+    const validImageType = (idProofMatch[1] === "image/png" && isPng) || (idProofMatch[1] === "image/jpeg" && isJpeg) || (idProofMatch[1] === "image/webp" && isWebp);
+    if (!proofBuffer.length || proofBuffer.length > 3 * 1024 * 1024 || !validImageType) {
+      return res.status(400).json({ message: "Upload a valid JPG, PNG, or WebP ID image no larger than 3 MB." });
     }
     if (await Authority.exists({ email })) return res.status(409).json({ message: "An account already exists for this email. Contact the authority administrator for your User ID." });
     if (await AccessRequest.exists({ email, status: "pending" })) return res.status(409).json({ message: "An access request for this email is already awaiting review." });
-    if (await Authority.exists({ governmentStaffId })) return res.status(409).json({ message: "An account already exists for this government staff ID. Contact the authority administrator." });
-    if (await AccessRequest.exists({ governmentStaffId, status: "pending" })) return res.status(409).json({ message: "An access request for this government staff ID is already awaiting review." });
 
     const trackingToken = crypto.randomBytes(32).toString("hex");
     const trackingTokenHash = crypto.createHash("sha256").update(trackingToken).digest("hex");
-    const accessRequest = await AccessRequest.create({ fullName, email, organization, governmentStaffId, reason, trackingTokenHash });
+    const accessRequest = await AccessRequest.create({ fullName, email, organization, idProofImage: { data: proofBuffer, contentType: idProofMatch[1] }, reason, trackingTokenHash });
     res.status(201).json({ requestId: accessRequest.id, trackingToken, message: "Access request sent. This device will show the approval status and your User ID when the administrator approves it." });
   } catch (error) {
-    if (error.code === 11000) return res.status(409).json({ message: "An account or access request already exists for this email or government staff ID." });
+    if (error.code === 11000) return res.status(409).json({ message: "An access request for this email is already awaiting review." });
     next(error);
   }
 });
@@ -245,22 +251,35 @@ app.post("/api/auth/users", requireAuthority, async (req, res, next) => {
 app.get("/api/auth/pending", requireAuthority, async (req, res, next) => {
   try {
     if (req.authority.role !== "admin") return res.status(403).json({ message: "Administrator access is required." });
-    const requests = await AccessRequest.find({ status: "pending" }).select("fullName email organization governmentStaffId reason createdAt").sort({ createdAt: 1 }).lean();
+    const requests = await AccessRequest.find({ status: "pending" }).select("fullName email organization governmentStaffId idProofImage.contentType reason createdAt").sort({ createdAt: 1 }).lean();
     res.json({ requests });
+  } catch (error) { next(error); }
+});
+
+app.get("/api/auth/pending/:id/staff-id-proof", requireAuthority, async (req, res, next) => {
+  try {
+    if (req.authority.role !== "admin") return res.status(403).json({ message: "Administrator access is required." });
+    if (!/^[a-f\d]{24}$/i.test(req.params.id)) return res.status(400).json({ message: "Invalid access request." });
+    const request = await AccessRequest.findOne({ _id: req.params.id, status: "pending" }).select("+idProofImage.data").lean();
+    if (!request?.idProofImage?.data) return res.status(404).json({ message: "ID proof image was not found." });
+    res.set({ "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff", "Content-Disposition": "inline; filename=government-staff-id-proof" });
+    res.type(request.idProofImage.contentType).send(request.idProofImage.data);
   } catch (error) { next(error); }
 });
 
 app.post("/api/auth/pending/:id/approve", requireAuthority, async (req, res, next) => {
   try {
     if (req.authority.role !== "admin") return res.status(403).json({ message: "Administrator access is required." });
-    const request = await AccessRequest.findOne({ _id: req.params.id, status: "pending" });
+    const request = await AccessRequest.findOne({ _id: req.params.id, status: "pending" }).select("+idProofImage.data");
     if (!request) return res.status(404).json({ message: "Access request not found or already processed." });
     const username = String(req.body.username || "").trim().toLowerCase();
     if (!/^[a-z0-9._-]{3,40}$/.test(username)) return res.status(400).json({ message: "User ID must be 3–40 letters, numbers, dots, underscores, or hyphens." });
+    if (!request.idProofImage?.data) return res.status(400).json({ message: "This request has no ID proof image. Ask the applicant to submit a new request with a valid image." });
     const user = await Authority.create({ username, email: request.email, governmentStaffId: request.governmentStaffId, role: "authority", active: false });
     request.status = "approved";
     request.approvedBy = req.authority._id;
     request.authorityId = user._id;
+    request.idProofImage = undefined;
     await request.save();
     res.json({ user: { username: user.username, email: user.email, role: user.role } });
   } catch (error) {
